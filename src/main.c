@@ -95,12 +95,16 @@ int main(int argc, char *argv[]) {
     } else {
       rcvcnt++;
       fprintf(stdout,
-              "\n## recieve flame (No.%04d, size: %05d) "
-              "##########################\n",
+              "\n"
+              "## recieve flame (No.%05d, size: %05d) "
+              "##########################"
+              "\n ",
               rcvcnt, size);
       AnalyzePacket((u_char *)buf, size);
-      fprintf(stdout, "########################################################"
-                      "##########\n");
+      fprintf(
+          stdout,
+          "##################################################################"
+          "\n");
     }
   }
 
