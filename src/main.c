@@ -11,7 +11,7 @@
 #include <netinet/if_ether.h> //usr/include <linux/if_ether.h> ETH_P_IP, ETH_P_ALL
 #include <netpacket/packet.h> //usr/include sockaddr_ll
 
-int InitRawSocket(char *Device, int IPOnlyFlag, int PromiscFlag) {
+int InitRawSocket(char *Device, int IPOnlyFlag, int PromiscFlag) { /*{{{*/
   printf("# InitRawSocket\n");
   struct ifreq ifreq;
   struct sockaddr_ll sa_ll;
@@ -67,15 +67,15 @@ int InitRawSocket(char *Device, int IPOnlyFlag, int PromiscFlag) {
   }
 
   return (soc);
-}
+} /*}}}*/
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) { /*{{{*/
   typedef struct {
     char *Device;
     int IPOnlyFlag;
     int PromiscFlag;
   } PARAM;
-  PARAM Param = {"enp1s0", 0, 0};
+  PARAM Param = {"enp1s0", 1, 0};
 
   char buf[65535];
   int soc, size, rcvcnt;
@@ -95,19 +95,18 @@ int main(int argc, char *argv[]) {
     } else {
       rcvcnt++;
       fprintf(stdout,
-              "\n"
+              "\n\e[32m"
               "## recieve flame (No.%05d, size: %05d) "
-              "##########################"
-              "\n ",
+              "#########################"
+              "\e[0m\n",
               rcvcnt, size);
       AnalyzePacket((u_char *)buf, size);
-      fprintf(
-          stdout,
-          "##################################################################"
-          "\n");
+      fprintf(stdout, "\e[32m##################################################"
+                      "################"
+                      "\e[0m\n");
     }
   }
 
   close(soc);
   return (0);
-}
+} /*}}}*/

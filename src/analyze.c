@@ -10,7 +10,7 @@
 #include <netinet/tcp.h>     //tcphdr
 #include <netinet/udp.h>     //udphdr
 
-int AnalyzeArp(u_char *data, int size) {
+int AnalyzeArp(u_char *data, int size) { /*{{{*/
   u_char *ptr;
   int lest;
   struct ether_arp *arp;
@@ -37,9 +37,9 @@ int AnalyzeArp(u_char *data, int size) {
   PrintArp(arp, stdout);
 
   return (0);
-}
+} /*}}}*/
 
-int AnalyzeIcmp(u_char *data, int size) {
+int AnalyzeIcmp(u_char *data, int size) { /*{{{*/
   u_char *ptr;
   int lest;
   struct icmp *icmp;
@@ -61,9 +61,9 @@ int AnalyzeIcmp(u_char *data, int size) {
   PrintIcmp(icmp, stdout);
 
   return (0);
-}
+} /*}}}*/
 
-int AnalyzeTCP(u_char *data, int size) {
+int AnalyzeTCP(u_char *data, int size) { /*{{{*/
   u_char *ptr;
   int lest;
   struct tcphdr *tcphdr;
@@ -82,9 +82,9 @@ int AnalyzeTCP(u_char *data, int size) {
 
   PrintTCP(tcphdr, stdout);
   return (0);
-}
+} /*}}}*/
 
-int AnalyzeUDP(u_char *data, int size) {
+int AnalyzeUDP(u_char *data, int size) { /*{{{*/
   u_char *ptr;
   int lest;
   struct udphdr *udphdr;
@@ -103,9 +103,9 @@ int AnalyzeUDP(u_char *data, int size) {
 
   PrintUDP(udphdr, stdout);
   return (0);
-}
+} /*}}}*/
 
-int AnalyzeIp(u_char *data, int size) {
+int AnalyzeIp(u_char *data, int size) { /*{{{*/
   u_char *ptr;
   int lest;
   struct iphdr *iphdr;
@@ -135,43 +135,67 @@ int AnalyzeIp(u_char *data, int size) {
   ptr += opt_len;
   lest -= opt_len;
 
+  // check sum of ip header
+  sum = IpHdrChecksum(iphdr, opt, opt_len);
+  fprintf(stdout, "    (IphdrChecksum: 0x%04x)\n", sum);
+  if ((sum != 0) && (sum != 0xFFFF)) {
+    fprintf(stderr, "    \e[31m(bad ip header checksum)\e[0m\n");
+  }
+
   // print ip header
   PrintIpHeader(iphdr, opt, opt_len, stdout);
 
   // analyze protocol
-  switch (iphdr->protocol) {
-  case IPPROTO_ICMP:
+  if (iphdr->protocol == IPPROTO_ICMP) {
     len = ntohs(iphdr->tot_len) - iphdr->ihl * 4;
     sum = checksum(ptr, len);
-    fprintf(stdout, "    (icmp checksum: %04x)\n", sum);
+    fprintf(stdout, "    (icmp checksum: 0x%04x)\n", sum);
     if (sum != 0xFFFF && sum != 0) {
       fprintf(stderr, "    \e[31m(bad icmp checksum)\e[0m\n");
       //       return (-1);
     }
     AnalyzeIcmp(ptr, len);
-    break;
-  case IPPROTO_TCP:
+
+  } else if (iphdr->protocol == IPPROTO_TCP) {
+    len = ntohs(iphdr->tot_len) - iphdr->ihl * 4;
+    sum = IpDataChecksum(iphdr, ptr, len);
+    fprintf(stdout, "    (tcp checksum: 0x%04x)\n", sum);
+    if (sum != 0xFFFF && sum != 0) {
+      fprintf(stderr, "    \e[31m(bad tcp checksum)\e[0m\n");
+      //       return (-1);
+    }
     AnalyzeTCP(ptr, lest);
-    break;
-  case IPPROTO_UDP:
+
+  } else if (iphdr->protocol == IPPROTO_UDP) {
+    // if udphdr check field is not 0, check ckecksum of udp
+    struct udphdr *udphdr = (struct udphdr *)ptr;
+    if (udphdr->check != 0) {
+      len = ntohs(iphdr->tot_len) - iphdr->ihl * 4;
+      sum = IpDataChecksum(iphdr, ptr, len);
+      fprintf(stdout, "    (udp checksum: 0x%04x)\n", sum);
+      if (sum != 0xFFFF && sum != 0) {
+        fprintf(stderr, "    \e[31m(bad udp checksum)\e[0m\n");
+        //       return (-1);
+      }
+    }
     AnalyzeUDP(ptr, lest);
-    break;
+
+  } else if (iphdr->protocol == IPPROTO_UDP) {
     //   case IPPROTO_IPV6:
     //     //     AnalyzeIpv6(ptr, lest);
-    //     break;
-  default:
-    break;
+
+  } else {
+    fprintf(stderr, "    \e[31m(unknown l4 protocol)\e[0m\n");
   }
-
   return (0);
-}
+} /*}}}*/
 
-int AnalyzeIpv6(u_char *data, int size) {
+int AnalyzeIpv6(u_char *data, int size) { /*{{{*/
   ;
   return (0);
-}
+} /*}}}*/
 
-int AnalyzePacket(u_char *data, int size) {
+int AnalyzePacket(u_char *data, int size) { /*{{{*/
   u_char *ptr;
   int lest;
   struct ether_header *eth;
@@ -206,4 +230,4 @@ int AnalyzePacket(u_char *data, int size) {
   }
 
   return (0);
-}
+} /*}}}*/
