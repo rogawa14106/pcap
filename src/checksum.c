@@ -110,7 +110,7 @@ u_int16_t IpHdrChecksum(struct iphdr *iphdr, u_char *opt, int opt_len) { /*{{{*/
 } /*}}}*/
 
 u_int16_t IpDataChecksum(struct iphdr *iphdr, u_char *data, int len) { /*{{{*/
-  struct psedou_ip {
+  struct psedou_hdr {
     u_int32_t saddr;
     u_int32_t daddr;
     u_int8_t padding;
@@ -119,10 +119,10 @@ u_int16_t IpDataChecksum(struct iphdr *iphdr, u_char *data, int len) { /*{{{*/
   };
 
   u_int16_t sum;
-  struct psedou_ip pseudo_hdr;
+  struct psedou_hdr pseudo_hdr;
 
   // create pseudo header to caliculate checksum of udp/tcp
-  memset(&pseudo_hdr, 0, sizeof(struct psedou_ip));
+  memset(&pseudo_hdr, 0, sizeof(struct psedou_hdr));
   pseudo_hdr.saddr = iphdr->saddr;
   pseudo_hdr.daddr = iphdr->daddr;
   pseudo_hdr.protocol = iphdr->protocol;

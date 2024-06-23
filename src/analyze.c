@@ -1,7 +1,12 @@
+// #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
+// #include <string.h>
 #include <sys/types.h> //usr/incldue/x86_64-linux-gnu u_char
 // #include <unistd.h>
+#include "analyze.h"
 #include "checksum.h"
+#include "dns.h"
 #include "print.h"
 #include <net/ethernet.h>     //ether_header
 #include <netinet/if_ether.h> //ether_arp
@@ -102,6 +107,11 @@ int AnalyzeUDP(u_char *data, int size) { /*{{{*/
   lest -= sizeof(struct udphdr);
 
   PrintUDP(udphdr, stdout);
+
+  // analyze protocol
+  if (ntohs(udphdr->dest) == 53 || ntohs(udphdr->source) == 53) {
+    AnalyzeDNS(ptr, lest);
+  }
   return (0);
 } /*}}}*/
 
@@ -229,5 +239,45 @@ int AnalyzePacket(u_char *data, int size) { /*{{{*/
     fprintf(stdout, "(unknown)\n");
   }
 
+  return (0);
+} /*}}}*/
+
+int AnalyzeDNS(u_char *data, int size) { /*{{{*/
+  u_char *ptr;
+  int lest;
+  u_char *start;
+  struct dnshdr *dnshdr;
+  struct dnsdata *dnsdata;
+
+  ptr = data;
+  lest = size;
+  start = ptr; // abs data ptr
+
+  if (lest < sizeof(struct dnshdr)) {
+    fprintf(stderr, "AnalyzeDNZ:error:lest(%d)<sizeof(struct dnshdr)(%ld)\n",
+            lest, sizeof(struct dnshdr));
+    return (-1);
+  }
+
+  dnshdr = (struct dnshdr *)data;
+  ptr += sizeof(struct dnshdr);
+  lest -= sizeof(struct dnshdr);
+
+  PrintDNSHdr(dnshdr, stdout);
+
+  //   PrintHexDump(ptr, lest);
+  dnsdata = (struct dnsdata *)malloc(sizeof(struct dnsdata));
+  ParseDNSData(ptr, lest, start, dnsdata);
+  PrintDNSData(dnsdata, htons(dnshdr->ancount), stdout);
+  //   if (dnshdr->flags & DNS_QR) {
+  //     // response
+  //     AnalyzeDNSR(dnshdr, ptr, lest);
+  //   } else {
+  //     // query
+  //     int qsize;
+  //     AnalyzeDNSQ(dnshdr, ptr, &qsize);
+  //   }
+
+  free(dnsdata);
   return (0);
 } /*}}}*/

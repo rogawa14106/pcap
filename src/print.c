@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include <string.h>
 // #include <sys/types.h>//u_char
+#include "dns.h"
 #include <arpa/inet.h>        //htonl, htons
 #include <net/ethernet.h>     //ether_header
 #include <netinet/ether.h>    //ehter_ntoa, ether_ntoa_r
@@ -8,6 +10,17 @@
 #include <netinet/ip_icmp.h>  //icmp
 #include <netinet/tcp.h>      //tcphdr
 #include <netinet/udp.h>      //udphdr
+
+int PrintHexDump(u_char *data, int lest) {/*{{{*/
+  printf("--- Hex Dump Start ---\n");
+  while (lest) {
+    printf("ptr: %p, HEX: %02x, CHAR: %c\n", data, *data, *data);
+    data++;
+    lest--;
+  }
+  printf("--- Hex Dump Done ---\n");
+  return 0;
+};/*}}}*/
 
 // <netinet/ether.h>で定義されているether_ntoa_rだと0埋めしてくれないから、自分で定義する。
 char *my_ether_ntoa_r(u_char *hwaddr, char *buf, socklen_t size) { /*{{{*/
@@ -85,7 +98,8 @@ int PrintArp(struct ether_arp *arp, FILE *fp) { /*{{{*/
   return (0);
 } /*}}}*/
 
-int PrintIpHeader(struct iphdr *iphdr, u_char *opt, int opt_len, FILE *fp) { /*{{{*/
+int PrintIpHeader(struct iphdr *iphdr, u_char *opt, int opt_len,
+                  FILE *fp) { /*{{{*/
   char buf[80];
   fprintf(fp, "    \e[32m== ip_header ==\e[0m\n");
   //  ip address
@@ -169,3 +183,85 @@ int PrintUDP(struct udphdr *udphdr, FILE *fp) { /*{{{*/
   fprintf(fp, "        check: 0x%04x\n", ntohs(udphdr->check));
   return (0);
 } /*}}}*/
+
+int PrintDNSHdr(struct dnshdr *dnshdr, FILE *fp) { /*{{{*/
+  u_int16_t flg = ntohs(dnshdr->flags);
+  fprintf(fp, "            \e[32m== DNS ==\e[0m\n");
+  fprintf(fp, "            id        : %u\n", ntohs(dnshdr->id));
+  fprintf(fp, "            flags     : 0x%04x\n", flg);
+  fprintf(fp, "                QR    : 0x%04x", flg & DNS_QR);
+  if (flg & DNS_QR) {
+    fprintf(fp, "(response)\n");
+  } else {
+    fprintf(fp, "(query)\n");
+  }
+  fprintf(fp, "                Opcode: 0x%04x\n", flg);
+  fprintf(fp, "                AA    : 0x%04x\n", flg);
+  fprintf(fp, "                TC    : 0x%04x\n", flg);
+  fprintf(fp, "                RD    : 0x%04x\n", flg);
+  fprintf(fp, "                RA    : 0x%04x\n", flg);
+  fprintf(fp, "                Z     : 0x%04x\n", flg);
+  fprintf(fp, "                RCODE : 0x%04x\n", flg);
+  fprintf(fp, "            qdcount   : %u\n", ntohs(dnshdr->qdcount));
+  fprintf(fp, "            ancount   : %u\n", ntohs(dnshdr->ancount));
+  fprintf(fp, "            nscount   : %u\n", ntohs(dnshdr->nscount));
+  fprintf(fp, "            arcount   : %u\n", ntohs(dnshdr->arcount));
+  return (0);
+} /*}}}*/
+
+int PrintDNSData(struct dnsdata *dnsdata, u_int16_t ancount, FILE *fp) {/*{{{*/
+  // # print query section
+  printf("            --- query section ---\n");
+  printf("            name  : %s\n", dnsdata->dnsq.name);
+  printf("            type  : %04x\n", ntohs(dnsdata->dnsq.type));
+  printf("            class : %04x\n", ntohs(dnsdata->dnsq.class));
+
+  // # print resource record section
+  int rr_cnt = 0;
+  while (rr_cnt < ancount) {
+    fprintf(fp, "            --- resoure record ---\n");
+    fprintf(fp, "            name  : %s\n", dnsdata->dnsrr[rr_cnt].name);
+    fprintf(fp, "            type  : %04x\n",
+            ntohs(dnsdata->dnsrr[rr_cnt].type));
+    fprintf(fp, "            class : %04x\n",
+            ntohs(dnsdata->dnsrr[rr_cnt].class));
+    fprintf(fp, "            ttl   : %08x\n",
+            ntohs(dnsdata->dnsrr[rr_cnt].ttl));
+    fprintf(fp, "            rdlen : %04x\n",
+            ntohs(dnsdata->dnsrr[rr_cnt].rdlen));
+    if (htons(dnsdata->dnsrr[rr_cnt].type) == DNS_RRT_A) {
+      uint32_t addr;
+      char buf[80];
+      memcpy(&addr, &dnsdata->dnsrr[rr_cnt].rdata, sizeof(u_int32_t));
+      fprintf(fp, "            rdata : %s\n",
+              ip_ip2str(addr, buf, sizeof(buf)));
+    } else if (htons(dnsdata->dnsrr[rr_cnt].type) == DNS_RRT_CNAME) {
+      fprintf(fp, "            rdata : %s\n", dnsdata->dnsrr[rr_cnt].rdata);
+    } else if (htons(dnsdata->dnsrr[rr_cnt].type) == DNS_RRT_AAAA) {
+      fprintf(fp,
+              "            rdata : %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x\n",
+              (int)*dnsdata->dnsrr[rr_cnt].rdata,
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+1),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+2),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+3),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+4),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+5),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+6),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+7),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+8),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+9),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+10),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+11),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+12),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+13),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+14),
+              (int)*(dnsdata->dnsrr[rr_cnt].rdata+15));
+    } else {
+      fprintf(fp, "            rdata: type not supported. print hexdump");
+      PrintHexDump(dnsdata->dnsrr[rr_cnt].rdata,
+               ntohs(dnsdata->dnsrr[rr_cnt].rdlen));
+    }
+    rr_cnt++;
+  }
+  return 0;
+}/*}}}*/

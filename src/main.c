@@ -76,6 +76,8 @@ int main(int argc, char *argv[]) { /*{{{*/
     int PromiscFlag;
   } PARAM;
   PARAM Param = {"enp1s0", 1, 0};
+  //    PARAM Param = {"wlp0s20f3", 1, 0};
+  //   PARAM Param = {"lo", 0, 0};
 
   char buf[65535];
   int soc, size, rcvcnt;
